@@ -8,6 +8,11 @@
     :root {
       color-scheme: light;
       font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  <title>Live Formatter</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
       background-color: #f8fafc;
       color: #0f172a;
     }
@@ -44,6 +49,7 @@
     .panes {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 1rem;
     }
 
@@ -94,11 +100,14 @@
       background: #0ea5e9;
       color: white;
       box-shadow: 0 6px 18px rgba(14, 165, 233, 0.35);
+      font-weight: 600;
+      color: #1e293b;
     }
 
     textarea {
       width: 100%;
       min-height: 320px;
+      min-height: 260px;
       border: 1px solid #cbd5e1;
       border-radius: 10px;
       padding: 0.75rem;
@@ -106,6 +115,7 @@
       line-height: 1.6;
       resize: vertical;
       font-family: inherit;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
       background: #f8fafc;
       color: #0f172a;
       transition: border-color 150ms ease, box-shadow 150ms ease;
@@ -120,6 +130,7 @@
 
     .preview {
       min-height: 320px;
+      min-height: 260px;
       border-radius: 10px;
       border: 1px solid #e2e8f0;
       padding: 0.75rem;
@@ -179,6 +190,35 @@
 
     .spacer {
       height: 0.6rem;
+    .tabs {
+      display: inline-flex;
+      background: #e2e8f0;
+      border-radius: 12px;
+      padding: 0.25rem;
+      gap: 0.25rem;
+      margin: 0 auto;
+    }
+
+    .tab {
+      border: none;
+      background: transparent;
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      font-weight: 600;
+      color: #1e293b;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .tab:focus-visible {
+      outline: 3px solid rgba(37, 99, 235, 0.4);
+      outline-offset: 2px;
+    }
+
+    .tab.active {
+      background: #0ea5e9;
+      color: white;
+      box-shadow: 0 6px 18px rgba(14, 165, 233, 0.35);
     }
   </style>
 </head>
@@ -187,6 +227,8 @@
     <header>
       <h1>Advisory Builder</h1>
       <p class="lead">Populate the editable fields to assemble your advisory preview.</p>
+      <h1>Live Text Previewer</h1>
+      <p class="lead">Type on the left and see a neatly formatted preview on the right.</p>
       <div class="tabs" role="tablist" aria-label="Advisory types">
         <button class="tab active" role="tab" aria-selected="true" aria-controls="panel-ground-stop" data-type="Ground Stop" id="tab-ground-stop">Ground Stop</button>
         <button class="tab" role="tab" aria-selected="false" aria-controls="panel-ground-delay" data-type="Ground Delay Program" id="tab-ground-delay">Ground Delay Program</button>
@@ -200,6 +242,10 @@
         <div id="input-container"></div>
         <div class="tip">
           Tip: Text outside of the fields is fixed; type into the boxed fields to update the preview.
+        <label for="source">Your text</label>
+        <textarea id="source" aria-label="Input text" placeholder="Start typing..." autofocus></textarea>
+        <div class="tip">
+          Tip: Use **double asterisks** for bold and _underscores_ for italics. New lines are preserved in the preview.
         </div>
       </section>
 
@@ -404,6 +450,35 @@
         })
         .join("\n");
     }
+    const source = document.getElementById("source");
+    const preview = document.getElementById("preview");
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+
+    const groundStopTemplate = `vATCSCC ADVZY {Header Advisory Number} {Header Airport/Facility} {Header Date Group} CDM GROUND STOP
+CTL ELEMENT: {CTL Element}
+ELEMENT TYPE: APT
+ADL TIME: {ADL Time}
+GROUND STOP PERIOD: {Ground Stop Period Start} - {Ground Stop Period End}
+CUMULATIVE PROGRAM PERIOD: {Cumulative Program Period Start} - {Cumulative Program Period End}
+FLT INCL: {Flight Inclusions}
+DEP FACILITIES INCLUDED: {Departure Facilities Included}
+CURRENT TOTAL, MAXIMUM, AVERAGE DELAYS: {Current Delays}
+PREVIOUS TOTAL, MAXIMUM, AVERAGE DELAYS: {Previous Delays}
+NEW TOTAL, MAXIMUM, AVERAGE DELAYS: {New Delays}
+PROBABILITY OF EXTENSION: {Probability of Extension}
+IMPACTING CONDITION: {Impacting Condition} / {Specific Condition}
+COMMENTS: {Comments}
+ 
+{Advisory Valid Start}-{Advisory Valid End}
+{Advisory Signature}`;
+
+    const contentByType = {
+      "Ground Stop": groundStopTemplate,
+      "Ground Delay Program": "",
+      Reroute: "",
+    };
+
+    let currentType = "Ground Stop";
 
     function escapeHTML(value) {
       return value
@@ -422,6 +497,8 @@
         .split(/\n{2,}/)
         .map((block) => block.replace(/\n/g, "<br>"))
         .map((block) => `<p>${block}</p>`)
+        .map(block => block.replace(/\n/g, "<br>"))
+        .map(block => `<p>${block}</p>`) // wrap each block in a paragraph
         .join("");
 
       return paragraphs;
@@ -443,6 +520,7 @@
 
       if (!activeTextarea) return;
       const value = activeTextarea.value.trim();
+      const value = source.value.trim();
       if (!value) {
         preview.innerHTML = "Your formatted text will appear here.";
         preview.classList.add("placeholder");
@@ -451,10 +529,13 @@
 
       preview.classList.remove("placeholder");
       preview.innerHTML = formatText(activeTextarea.value);
+      preview.innerHTML = formatText(source.value);
     }
 
     function switchTab(newType) {
       if (newType === currentType) return;
+
+      contentByType[currentType] = source.value;
       currentType = newType;
 
       tabs.forEach((tab) => {
@@ -471,6 +552,9 @@
       }
 
       updatePreview();
+      source.value = contentByType[newType];
+      updatePreview();
+      source.focus();
     }
 
     tabs.forEach((tab) => {
@@ -484,6 +568,12 @@
     });
 
     renderGroundStop();
+    source.addEventListener("input", () => {
+      contentByType[currentType] = source.value;
+      updatePreview();
+    });
+
+    source.value = contentByType[currentType];
     updatePreview();
   </script>
 </body>

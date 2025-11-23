@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advisory Builder</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
   <title>Live Formatter</title>
   <style>
     :root {
@@ -33,6 +38,7 @@
     h1 {
       margin: 0;
       font-size: clamp(1.75rem, 4vw, 2.5rem);
+      letter-spacing: 0.04em;
     }
 
     p.lead {
@@ -42,6 +48,7 @@
 
     .panes {
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 1rem;
     }
@@ -58,12 +65,48 @@
     }
 
     label {
+      font-weight: 700;
+      color: #1e293b;
+      letter-spacing: 0.01em;
+    }
+
+    .tabs {
+      display: inline-flex;
+      background: #e2e8f0;
+      border-radius: 12px;
+      padding: 0.25rem;
+      gap: 0.25rem;
+      margin: 0.5rem auto 0;
+    }
+
+    .tab {
+      border: none;
+      background: transparent;
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      font-weight: 700;
+      color: #1e293b;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+      font-family: inherit;
+    }
+
+    .tab:focus-visible {
+      outline: 3px solid rgba(37, 99, 235, 0.4);
+      outline-offset: 2px;
+    }
+
+    .tab.active {
+      background: #0ea5e9;
+      color: white;
+      box-shadow: 0 6px 18px rgba(14, 165, 233, 0.35);
       font-weight: 600;
       color: #1e293b;
     }
 
     textarea {
       width: 100%;
+      min-height: 320px;
       min-height: 260px;
       border: 1px solid #cbd5e1;
       border-radius: 10px;
@@ -71,6 +114,7 @@
       font-size: 1rem;
       line-height: 1.6;
       resize: vertical;
+      font-family: inherit;
       font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
       background: #f8fafc;
       color: #0f172a;
@@ -85,6 +129,7 @@
     }
 
     .preview {
+      min-height: 320px;
       min-height: 260px;
       border-radius: 10px;
       border: 1px solid #e2e8f0;
@@ -94,6 +139,7 @@
       line-height: 1.7;
       white-space: pre-wrap;
       word-wrap: break-word;
+      font-family: inherit;
     }
 
     .placeholder {
@@ -108,6 +154,42 @@
       border: 1px solid #bae6fd;
       font-size: 0.95rem;
     }
+
+    .ground-stop-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+
+    .line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: baseline;
+    }
+
+    .inline-input {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 0.3rem 0.45rem;
+      background: #f8fafc;
+      font-family: inherit;
+      font-size: 1rem;
+      min-width: 120px;
+      color: #0f172a;
+    }
+
+    .inline-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+      background: white;
+    }
+
+    .spacer {
+      height: 0.6rem;
     .tabs {
       display: inline-flex;
       background: #e2e8f0;
@@ -143,6 +225,8 @@
 <body>
   <main class="page">
     <header>
+      <h1>Advisory Builder</h1>
+      <p class="lead">Populate the editable fields to assemble your advisory preview.</p>
       <h1>Live Text Previewer</h1>
       <p class="lead">Type on the left and see a neatly formatted preview on the right.</p>
       <div class="tabs" role="tablist" aria-label="Advisory types">
@@ -154,6 +238,10 @@
 
     <div class="panes" id="panels">
       <section class="card">
+        <label for="source">Inputs</label>
+        <div id="input-container"></div>
+        <div class="tip">
+          Tip: Text outside of the fields is fixed; type into the boxed fields to update the preview.
         <label for="source">Your text</label>
         <textarea id="source" aria-label="Input text" placeholder="Start typing..." autofocus></textarea>
         <div class="tip">
@@ -171,6 +259,197 @@
   </main>
 
   <script>
+    const preview = document.getElementById("preview");
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const inputContainer = document.getElementById("input-container");
+
+    const groundStopFields = {
+      headerAdvisoryNumber: "",
+      headerAirportFacility: "",
+      headerDateGroup: "",
+      ctlElement: "",
+      adlTime: "",
+      groundStopPeriodStart: "",
+      groundStopPeriodEnd: "",
+      cumulativeProgramPeriodStart: "",
+      cumulativeProgramPeriodEnd: "",
+      flightInclusions: "",
+      departureFacilitiesIncluded: "",
+      currentDelays: "",
+      previousDelays: "",
+      newDelays: "",
+      probabilityOfExtension: "",
+      impactingCondition: "",
+      specificCondition: "",
+      comments: "",
+      advisoryValidStart: "",
+      advisoryValidEnd: "",
+      advisorySignature: "",
+    };
+
+    const groundStopStructure = [
+      [
+        { text: "vATCSCC ADVZY " },
+        { field: "headerAdvisoryNumber", placeholder: "Header Advisory Number" },
+        { text: " " },
+        { field: "headerAirportFacility", placeholder: "Header Airport/Facility" },
+        { text: " " },
+        { field: "headerDateGroup", placeholder: "Header Date Group" },
+        { text: " CDM GROUND STOP" },
+      ],
+      [{ text: "CTL ELEMENT: " }, { field: "ctlElement", placeholder: "CTL Element" }],
+      [{ text: "ELEMENT TYPE: APT" }],
+      [{ text: "ADL TIME: " }, { field: "adlTime", placeholder: "ADL Time" }],
+      [
+        { text: "GROUND STOP PERIOD: " },
+        { field: "groundStopPeriodStart", placeholder: "Ground Stop Period Start" },
+        { text: " - " },
+        { field: "groundStopPeriodEnd", placeholder: "Ground Stop Period End" },
+      ],
+      [
+        { text: "CUMULATIVE PROGRAM PERIOD: " },
+        { field: "cumulativeProgramPeriodStart", placeholder: "Cumulative Program Period Start" },
+        { text: " - " },
+        { field: "cumulativeProgramPeriodEnd", placeholder: "Cumulative Program Period End" },
+      ],
+      [{ text: "FLT INCL: " }, { field: "flightInclusions", placeholder: "Flight Inclusions" }],
+      [
+        { text: "DEP FACILITIES INCLUDED: " },
+        { field: "departureFacilitiesIncluded", placeholder: "Departure Facilities Included" },
+      ],
+      [
+        { text: "CURRENT TOTAL, MAXIMUM, AVERAGE DELAYS: " },
+        { field: "currentDelays", placeholder: "Current Delays" },
+      ],
+      [
+        { text: "PREVIOUS TOTAL, MAXIMUM, AVERAGE DELAYS: " },
+        { field: "previousDelays", placeholder: "Previous Delays" },
+      ],
+      [
+        { text: "NEW TOTAL, MAXIMUM, AVERAGE DELAYS: " },
+        { field: "newDelays", placeholder: "New Delays" },
+      ],
+      [
+        { text: "PROBABILITY OF EXTENSION: " },
+        { field: "probabilityOfExtension", placeholder: "Probability of Extension" },
+      ],
+      [
+        { text: "IMPACTING CONDITION: " },
+        { field: "impactingCondition", placeholder: "Impacting Condition" },
+        { text: " / " },
+        { field: "specificCondition", placeholder: "Specific Condition" },
+      ],
+      [{ text: "COMMENTS: " }, { field: "comments", placeholder: "Comments" }],
+      [{ spacer: true }],
+      [
+        { field: "advisoryValidStart", placeholder: "Advisory Valid Start" },
+        { text: "-" },
+        { field: "advisoryValidEnd", placeholder: "Advisory Valid End" },
+      ],
+      [{ field: "advisorySignature", placeholder: "Advisory Signature" }],
+    ];
+
+    const contentByType = {
+      "Ground Stop": { mode: "template", values: { ...groundStopFields } },
+      "Ground Delay Program": { mode: "text", text: "" },
+      Reroute: { mode: "text", text: "" },
+    };
+
+    let currentType = "Ground Stop";
+    let activeTextarea = null;
+
+    function createInput(partKey, placeholder) {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "inline-input";
+      input.placeholder = placeholder;
+      input.setAttribute("aria-label", placeholder);
+      input.spellcheck = false;
+      input.value = contentByType["Ground Stop"].values[partKey] || "";
+      input.dataset.field = partKey;
+      input.addEventListener("input", (event) => {
+        contentByType["Ground Stop"].values[partKey] = event.target.value;
+        updatePreview();
+      });
+      return input;
+    }
+
+    function renderGroundStop() {
+      inputContainer.innerHTML = "";
+      activeTextarea = null;
+      const form = document.createElement("div");
+      form.className = "ground-stop-form";
+
+      groundStopStructure.forEach((parts) => {
+        if (parts.some((part) => part.spacer)) {
+          const spacer = document.createElement("div");
+          spacer.className = "spacer";
+          form.appendChild(spacer);
+          return;
+        }
+
+        const line = document.createElement("div");
+        line.className = "line";
+
+        parts.forEach((part) => {
+          if (part.text) {
+            const span = document.createElement("span");
+            span.textContent = part.text;
+            line.appendChild(span);
+          }
+
+          if (part.field) {
+            const input = createInput(part.field, part.placeholder);
+            line.appendChild(input);
+          }
+        });
+
+        form.appendChild(line);
+      });
+
+      inputContainer.appendChild(form);
+      const firstInput = form.querySelector("input");
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }
+
+    function renderTextArea(type) {
+      inputContainer.innerHTML = "";
+      const textarea = document.createElement("textarea");
+      textarea.id = "source";
+      textarea.placeholder = "Start typing...";
+      textarea.value = contentByType[type].text;
+      textarea.addEventListener("input", () => {
+        contentByType[type].text = textarea.value;
+        updatePreview();
+      });
+      inputContainer.appendChild(textarea);
+      activeTextarea = textarea;
+      textarea.focus();
+    }
+
+    function buildGroundStopPreview() {
+      const values = contentByType["Ground Stop"].values;
+      return groundStopStructure
+        .map((parts) => {
+          if (parts.some((part) => part.spacer)) {
+            return "";
+          }
+
+          return parts
+            .map((part) => {
+              if (part.text) return part.text;
+              if (part.field) {
+                const fieldValue = values[part.field]?.trim();
+                return fieldValue ? fieldValue : part.placeholder;
+              }
+              return "";
+            })
+            .join("");
+        })
+        .join("\n");
+    }
     const source = document.getElementById("source");
     const preview = document.getElementById("preview");
     const tabs = Array.from(document.querySelectorAll(".tab"));
@@ -216,6 +495,8 @@ COMMENTS: {Comments}
       const italicized = bolded.replace(/_(.+?)_/g, "<em>$1</em>");
       const paragraphs = italicized
         .split(/\n{2,}/)
+        .map((block) => block.replace(/\n/g, "<br>"))
+        .map((block) => `<p>${block}</p>`)
         .map(block => block.replace(/\n/g, "<br>"))
         .map(block => `<p>${block}</p>`) // wrap each block in a paragraph
         .join("");
@@ -224,6 +505,21 @@ COMMENTS: {Comments}
     }
 
     function updatePreview() {
+      if (currentType === "Ground Stop") {
+        const assembled = buildGroundStopPreview();
+        if (!assembled.trim()) {
+          preview.textContent = "Your formatted text will appear here.";
+          preview.classList.add("placeholder");
+          return;
+        }
+
+        preview.classList.remove("placeholder");
+        preview.textContent = assembled;
+        return;
+      }
+
+      if (!activeTextarea) return;
+      const value = activeTextarea.value.trim();
       const value = source.value.trim();
       if (!value) {
         preview.innerHTML = "Your formatted text will appear here.";
@@ -232,6 +528,7 @@ COMMENTS: {Comments}
       }
 
       preview.classList.remove("placeholder");
+      preview.innerHTML = formatText(activeTextarea.value);
       preview.innerHTML = formatText(source.value);
     }
 
@@ -248,6 +545,13 @@ COMMENTS: {Comments}
         tab.tabIndex = isActive ? 0 : -1;
       });
 
+      if (newType === "Ground Stop") {
+        renderGroundStop();
+      } else {
+        renderTextArea(newType);
+      }
+
+      updatePreview();
       source.value = contentByType[newType];
       updatePreview();
       source.focus();
@@ -263,6 +567,7 @@ COMMENTS: {Comments}
       });
     });
 
+    renderGroundStop();
     source.addEventListener("input", () => {
       contentByType[currentType] = source.value;
       updatePreview();
